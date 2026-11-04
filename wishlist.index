@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>心愿清单 Shopping Wishlist</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SortableJS for Touch Drag & Drop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
+    <!-- PWA Web App Manifest (Data URI) -->
+    <link rel="manifest" id="manifest-placeholder">
+
+    <script>
+        // Dynamically inject Manifest Data URI for PWA support
+        const manifestData = {
+            "name": "购物心愿单",
+            "short_name": "心愿单",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#f8fafc",
+            "theme_color": "#6366f1",
+            "icons": [
+                {
+                    "src": "https://placehold.co/192x192/6366f1/ffffff?text=清单",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "https://placehold.co/512x512/6366f1/ffffff?text=清单",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifestData);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.getElementById('manifest-placeholder').setAttribute('href', manifestURL);
+    </script>
+
+    <style>
+        /* Modern Native App Style Adjustments */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* Smooth Dragging visual cues */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #e2e8f0 !important;
+            border: 2px dashed #94a3b8 !important;
+        }
+
+        .sortable-drag {
+            opacity: 0.95;
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Safe area support for iOS devices */
+        .safe-bottom {
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        
+        .safe-top {
+            padding-top: env(safe-area-inset-top, 16px);
+        }
+
+        /* Scrollbar hide for clean app look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen w-screen flex flex-col overflow-hidden">
+
+    <!-- Top Header -->
+    <header class="bg-indigo-600 text-white safe-top shadow-md z-10 flex-shrink-0">
+        <div class="px-5 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <i class="fa-solid font-bold fa-basket-shopping text-indigo-200"></i>
+                    <span id="app-title">我的购物清单</span>
+                </h1>
+                <p class="text-xs text-indigo-200 mt-0.5" id="app-subtitle">轻松记录与规划想买的物品</p>
+            </div>
+            <!-- Quick Add Button -->
+            <button onclick="openAddModal()" class="bg-white/20 hover:bg-white/30 text-white p-2.5 rounded-full transition-all active:scale-95 flex items-center justify-center w-10 h-10 shadow-inner">
+                <i class="fa-solid fa-plus text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 overflow-y-auto no-scrollbar relative p-4 pb-24">
+
+        <!-- TAB 1: WISHLIST TAB -->
+        <section id="tab-wishlist" class="space-y-4 max-w-md mx-auto">
+            
+            <!-- Statistics Banner -->
+            <div class="grid grid-cols-3 gap-2 bg-white p-3 rounded-2xl shadow-sm text-center border border-slate-200/60">
+                <div class="p-1">
+                    <div class="text-xs text-slate-400 font-medium">急需购买</div>
+                    <div id="count-red" class="text-lg font-bold text-red-500">0</div>
+                </div>
+                <div class="p-1 border-x border-slate-100">
+                    <div class="text-xs text-slate-400 font-medium">迟些再买</div>
+                    <div id="count-yellow" class="text-lg font-bold text-amber-500">0</div>
+                </div>
+                <div class="p-1">
+                    <div class="text-xs text-slate-400 font-medium">可买可不买</div>
+                    <div id="count-green" class="text-lg font-bold text-emerald-500">0</div>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden text-center py-12 px-4">
+                <div class="w-20 h-20 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                    <i class="fa-solid fa-cart-flatbed font-light"></i>
+                </div>
+                <h3 class="text-slate-600 font-semibold text-lg">清单空空如也</h3>
+                <p class="text-slate-400 text-sm mt-1">点击右上角 “+” 按钮添加想买的物品吧！</p>
+            </div>
+
+            <!-- Drag & Drop Wishlist Container -->
+            <div id="wishlist-container" class="space-y-2.5 min-h-[100px]">
+                <!-- Dynamic Items will be rendered here -->
+            </div>
+
+            <div class="text-center text-xs text-slate-400 pt-2 flex items-center justify-center gap-1">
+                <i class="fa-solid fa-hand-pointer text-slate-300"></i> 按住左侧图标可上下拖动排序
+            </div>
+        </section>
+
+        <!-- TAB 2: SEARCH & HISTORY TAB -->
+        <section id="tab-search" class="hidden space-y-4 max-w-md mx-auto">
+            <!-- Search Bar -->
+            <div class="sticky top-0 z-10 bg-slate-100 pb-2">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" oninput="handleSearch()" placeholder="输入商品关键字搜索已购记录..." 
+                        class="w-full pl-10 pr-10 py-3 bg-white rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-sm text-sm">
+                    <button id="clear-search-btn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Results Summary -->
+            <div class="flex justify-between items-center px-1 text-xs text-slate-500 font-medium">
+                <span>已购买的历史记录</span>
+                <span id="search-count">共 0 条</span>
+            </div>
+
+            <!-- Search Results List -->
+            <div id="search-results-container" class="space-y-2.5">
+                <!-- Search items rendered dynamically -->
+            </div>
+
+            <!-- Empty Search State -->
+            <div id="search-empty-state" class="hidden text-center py-12 px-4">
+                <div class="w-16 h-16 bg-slate-200/60 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <p id="search-empty-text" class="text-slate-500 text-sm">暂无匹配的已购物品</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/80 safe-bottom z-20 shadow-lg">
+        <div class="max-w-md mx-auto flex justify-around items-center h-16">
+            <button onclick="switchTab('wishlist')" id="nav-btn-wishlist" class="flex-1 flex flex-col items-center justify-center text-indigo-600 transition-colors py-1">
+                <i class="fa-solid fa-list-check text-xl"></i>
+                <span class="text-xs mt-1 font-medium">想买清单</span>
+            </button>
+            <button onclick="switchTab('search')" id="nav-btn-search" class="flex-1 flex flex-col items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors py-1">
+                <i class="fa-solid fa-magnifying-glass text-xl"></i>
+                <span class="text-xs mt-1 font-medium">查找已购</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Modal for Adding / Editing Item -->
+    <div id="add-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300" id="modal-card">
+            
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold text-slate-800" id="modal-title">添加想买物品</h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleAddItem(event)" class="space-y-4">
+                <!-- Item Name Input -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">物品名称</label>
+                    <input type="text" id="item-name-input" required placeholder="例如：无线耳机、牛奶、咖啡豆..." 
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                </div>
+
+                <!-- Priority Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-2">紧急程度 / 优先级</label>
+                    <div class="grid grid-cols-3 gap-2" id="priority-options">
+                        
+                        <label class="cursor-pointer">
+                            <input type="radio" name="priority" value="red" checked class="peer hidden">
+                            <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700 transition-all flex flex-col items-center">
+                                <span class="w-3 h-3 rounded-full bg-red-500 mb-1.5 shadow-sm"></span>
+                                <span class="text-xs font-bold">急需要买</span>
+                            </div>
+                        </label>
+
+                        <label class="cursor-pointer">
+                            <input type="radio" name="priority" value="yellow" class="peer hidden">
+                            <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 transition-all flex flex-col items-center">
+                                <span class="w-3 h-3 rounded-full bg-amber-500 mb-1.5 shadow-sm"></span>
+                                <span class="text-xs font-bold">迟些买</span>
+                            </div>
+                        </label>
+
+                        <label class="cursor-pointer">
+                            <input type="radio" name="priority" value="green" class="peer hidden">
+                            <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 transition-all flex flex-col items-center">
+                                <span class="w-3 h-3 rounded-full bg-emerald-500 mb-1.5 shadow-sm"></span>
+                                <span class="text-xs font-bold">可买可不买</span>
+                            </div>
+                        </label>
+
+                    </div>
+                </div>
+
+                <!-- Notes / Remarks Optional Input -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">备注信息 (可选)</label>
+                    <input type="text" id="item-note-input" placeholder="规格、型号或预算价格..." 
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-[0.98] text-sm mt-2">
+                    确认保存
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2.5 rounded-full text-xs font-medium shadow-xl z-50 transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+        <span id="toast-message">操作成功</span>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // State Management
+        let items = [];
+        let sortableInstance = null;
+        let currentTab = 'wishlist';
+
+        // Priority Configuration
+        const priorityConfig = {
+            red: {
+                label: '急需要买',
+                colorClass: 'bg-red-500',
+                bgLight: 'bg-red-50 border-red-200',
+                badgeBg: 'bg-red-100 text-red-700 border-red-200',
+                order: 1
+            },
+            yellow: {
+                label: '迟些买',
+                colorClass: 'bg-amber-500',
+                bgLight: 'bg-amber-50 border-amber-200',
+                badgeBg: 'bg-amber-100 text-amber-700 border-amber-200',
+                order: 2
+            },
+            green: {
+                label: '可买可不买',
+                colorClass: 'bg-emerald-500',
+                bgLight: 'bg-emerald-50 border-emerald-200',
+                badgeBg: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                order: 3
+            },
+            completed: {
+                label: '已购买',
+                colorClass: 'bg-slate-400',
+                bgLight: 'bg-slate-50 border-slate-200 opacity-75',
+                badgeBg: 'bg-slate-200 text-slate-600 border-slate-300',
+                order: 4
+            }
+        };
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            loadItemsFromStorage();
+            initSortable();
+            renderWishlist();
+            registerServiceWorker();
+        });
+
+        // LocalStorage Logic
+        function loadItemsFromStorage() {
+            const saved = localStorage.getItem('shopping_pwa_items');
+            if (saved) {
+                try {
+                    items = JSON.parse(saved);
+                } catch (e) {
+                    console.error("Failed to parse storage data", e);
+                    items = getInitialSampleData();
+                }
+            } else {
+                items = getInitialSampleData();
+                saveItemsToStorage();
+            }
+        }
+
+        function saveItemsToStorage() {
+            localStorage.setItem('shopping_pwa_items', JSON.stringify(items));
+        }
+
+        // Demo Data for initial start
+        function getInitialSampleData() {
+            const today = getFormattedDate();
+            return [
+                { id: '1', title: '新鲜有机牛奶', priority: 'red', note: '超市2L装', purchased: false, purchaseDate: null, createdAt: Date.now() - 300000 },
+                { id: '2', title: '降噪蓝牙耳机', priority: 'yellow', note: '关注双十一优惠', purchased: false, purchaseDate: null, createdAt: Date.now() - 200000 },
+                { id: '3', title: '桌面小植栽', priority: 'green', note: '放书桌装饰', purchased: false, purchaseDate: null, createdAt: Date.now() - 100000 },
+                { id: '4', title: '人体工学键盘', priority: 'completed', note: '', purchased: true, purchaseDate: today, createdAt: Date.now() - 400000 }
+            ];
+        }
+
+        // Initialize Drag-and-Drop using SortableJS
+        function initSortable() {
+            const container = document.getElementById('wishlist-container');
+            sortableInstance = new Sortable(container, {
+                handle: '.drag-handle',
+                animation: 200,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                onEnd: function () {
+                    // Update order in state based on new DOM element layout
+                    const updatedItems = [];
+                    const domIds = Array.from(container.children).map(el => el.getAttribute('data-id'));
+                    
+                    domIds.forEach(id => {
+                        const found = items.find(item => item.id === id);
+                        if (found) updatedItems.push(found);
+                    });
+
+                    // Retain any items not currently in dom (if any)
+                    items.forEach(item => {
+                        if (!updatedItems.find(u => u.id === item.id)) {
+                            updatedItems.push(item);
+                        }
+                    });
+
+                    items = updatedItems;
+                    saveItemsToStorage();
+                    showToast("顺序已更新");
+                }
+            });
+        }
+
+        // Render Wishlist (Tab 1)
+        function renderWishlist() {
+            const container = document.getElementById('wishlist-container');
+            const emptyState = document.getElementById('empty-state');
+            
+            container.innerHTML = '';
+
+            // Update Counts
+            let unpurchasedCount = 0;
+            let countRed = 0, countYellow = 0, countGreen = 0;
+
+            items.forEach(item => {
+                if (!item.purchased) {
+                    unpurchasedCount++;
+                    if (item.priority === 'red') countRed++;
+                    if (item.priority === 'yellow') countYellow++;
+                    if (item.priority === 'green') countGreen++;
+                }
+            });
+
+            document.getElementById('count-red').textContent = countRed;
+            document.getElementById('count-yellow').textContent = countYellow;
+            document.getElementById('count-green').textContent = countGreen;
+
+            if (items.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            // Partition items: Unpurchased at top, Purchased items at bottom
+            const unpurchasedItems = items.filter(i => !i.purchased);
+            const purchasedItems = items.filter(i => i.purchased);
+
+            const displayList = [...unpurchasedItems, ...purchasedItems];
+
+            displayList.forEach(item => {
+                const isDone = item.purchased;
+                const conf = isDone ? priorityConfig.completed : (priorityConfig[item.priority] || priorityConfig.green);
+
+                const itemCard = document.createElement('div');
+                itemCard.setAttribute('data-id', item.id);
+                itemCard.className = `group bg-white rounded-2xl p-4 shadow-sm border ${isDone ? 'border-slate-200/60 bg-slate-50/70' : 'border-slate-200/80'} flex items-center justify-between gap-3 transition-all duration-200`;
+
+                itemCard.innerHTML = `
+                    <!-- Drag Handle (disabled for purchased items) -->
+                    <div class="${isDone ? 'opacity-20 cursor-not-allowed' : 'drag-handle cursor-grab active:cursor-grabbing'} p-1 text-slate-300 hover:text-slate-500 transition-colors">
+                        <i class="fa-solid fa-grip-vertical text-base"></i>
+                    </div>
+
+                    <!-- Priority Strip Indicator -->
+                    <div class="w-2.5 h-10 rounded-full ${conf.colorClass} flex-shrink-0 shadow-sm"></div>
+
+                    <!-- Main Content (Click to Toggle Purchased Status) -->
+                    <div onclick="toggleItemPurchased('${item.id}')" class="flex-1 min-w-0 cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-sm text-slate-800 truncate ${isDone ? 'line-through text-slate-400 font-normal' : ''}">
+                                ${escapeHtml(item.title)}
+                            </h4>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-medium border ${conf.badgeBg}">
+                                ${conf.label}
+                            </span>
+                        </div>
+                        
+                        <div class="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                            ${item.note ? `<span class="truncate"><i class="fa-regular fa-sticky-note mr-1"></i>${escapeHtml(item.note)}</span>` : ''}
+                            ${isDone && item.purchaseDate ? `<span class="text-indigo-500 font-medium"><i class="fa-solid fa-calendar-check mr-1"></i>购买于: ${item.purchaseDate}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Actions (Delete button) -->
+                    <div class="flex items-center gap-1">
+                        <button onclick="deleteItem('${item.id}', event)" title="删除条目" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                            <i class="fa-regular fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+                `;
+
+                container.appendChild(itemCard);
+            });
+        }
+
+        // Action: Toggle Item Purchased status
+        function toggleItemPurchased(id) {
+            const index = items.findIndex(i => i.id === id);
+            if (index === -1) return;
+
+            const item = items[index];
+
+            if (!item.purchased) {
+                // Mark as purchased
+                item.purchased = true;
+                item.purchaseDate = getFormattedDate();
+                showToast(`已标记为购买并移至底部 (${item.purchaseDate})`);
+
+                // Move item to bottom of array
+                items.splice(index, 1);
+                items.push(item);
+            } else {
+                // Unmark / Move back to unpurchased list
+                item.purchased = false;
+                item.purchaseDate = null;
+                showToast(`已恢复为想买状态`);
+                
+                // Move item back to the bottom of active items
+                items.splice(index, 1);
+                const lastUnpurchasedIdx = items.findLastIndex(i => !i.purchased);
+                if (lastUnpurchasedIdx >= 0) {
+                    items.splice(lastUnpurchasedIdx + 1, 0, item);
+                } else {
+                    items.unshift(item);
+                }
+            }
+
+            saveItemsToStorage();
+            renderWishlist();
+            
+            // If search tab is active, update search results too
+            if (currentTab === 'search') {
+                handleSearch();
+            }
+        }
+
+        // Action: Delete Item
+        function deleteItem(id, event) {
+            if (event) event.stopPropagation();
+            
+            const index = items.findIndex(i => i.id === id);
+            if (index === -1) return;
+
+            const title = items[index].title;
+            items.splice(index, 1);
+            saveItemsToStorage();
+            renderWishlist();
+            showToast(`已删除 "${title}"`);
+
+            if (currentTab === 'search') {
+                handleSearch();
+            }
+        }
+
+        // Action: Add New Item
+        function handleAddItem(event) {
+            event.preventDefault();
+
+            const nameInput = document.getElementById('item-name-input');
+            const noteInput = document.getElementById('item-note-input');
+            const priorityRadios = document.getElementsByName('priority');
+
+            let selectedPriority = 'red';
+            for (const radio of priorityRadios) {
+                if (radio.checked) {
+                    selectedPriority = radio.value;
+                    break;
+                }
+            }
+
+            const newItem = {
+                id: Date.now().toString(),
+                title: nameInput.value.trim(),
+                priority: selectedPriority,
+                note: noteInput.value.trim(),
+                purchased: false,
+                purchaseDate: null,
+                createdAt: Date.now()
+            };
+
+            // Add new item to the top of unpurchased list
+            items.unshift(newItem);
+            saveItemsToStorage();
+            renderWishlist();
+
+            closeAddModal();
+            nameInput.value = '';
+            noteInput.value = '';
+            showToast("成功添加新条目！");
+        }
+
+        // TAB 2: Search Functionality
+        function handleSearch() {
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
+            const clearBtn = document.getElementById('clear-search-btn');
+            const resultsContainer = document.getElementById('search-results-container');
+            const emptyState = document.getElementById('search-empty-state');
+            const searchCountEl = document.getElementById('search-count');
+
+            if (query.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+
+            // Filter ONLY purchased items that match keyword (even a single character match)
+            const purchasedList = items.filter(i => i.purchased);
+            
+            const filtered = purchasedList.filter(item => {
+                const nameMatch = item.title.toLowerCase().includes(query);
+                const noteMatch = item.note ? item.note.toLowerCase().includes(query) : false;
+                const dateMatch = item.purchaseDate ? item.purchaseDate.includes(query) : false;
+                return nameMatch || noteMatch || dateMatch;
+            });
+
+            searchCountEl.textContent = `共 ${filtered.length} 条`;
+            resultsContainer.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                document.getElementById('search-empty-text').textContent = query ? '未找到包含该字符的购买记录' : '暂无已购买的物品记录';
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            // Render Search Results
+            filtered.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between gap-3";
+                
+                card.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                            <h4 class="font-bold text-slate-800 text-sm truncate">${highlightMatch(escapeHtml(item.title), query)}</h4>
+                        </div>
+                        <div class="mt-1 flex items-center gap-3 text-xs text-slate-400">
+                            ${item.note ? `<span>${escapeHtml(item.note)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 flex items-center gap-1">
+                            <i class="fa-regular fa-calendar-check"></i>
+                            <span>${item.purchaseDate || '已购买'}</span>
+                        </div>
+                    </div>
+                `;
+                resultsContainer.appendChild(card);
+            });
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            handleSearch();
+        }
+
+        function highlightMatch(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, `<mark class="bg-amber-200 text-slate-900 rounded-sm px-0.5">$1</mark>`);
+        }
+
+        // Navigation Tabs Switcher
+        function switchTab(tab) {
+            currentTab = tab;
+            const tabWishlist = document.getElementById('tab-wishlist');
+            const tabSearch = document.getElementById('tab-search');
+            const btnWishlist = document.getElementById('nav-btn-wishlist');
+            const btnSearch = document.getElementById('nav-btn-search');
+            const appSubtitle = document.getElementById('app-subtitle');
+
+            if (tab === 'wishlist') {
+                tabWishlist.classList.remove('hidden');
+                tabSearch.classList.add('hidden');
+                
+                btnWishlist.className = "flex-1 flex flex-col items-center justify-center text-indigo-600 transition-colors py-1";
+                btnSearch.className = "flex-1 flex flex-col items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors py-1";
+                appSubtitle.textContent = "轻松记录与规划想买的物品";
+            } else {
+                tabWishlist.classList.add('hidden');
+                tabSearch.classList.remove('hidden');
+
+                btnSearch.className = "flex-1 flex flex-col items-center justify-center text-indigo-600 transition-colors py-1";
+                btnWishlist.className = "flex-1 flex flex-col items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors py-1";
+                appSubtitle.textContent = "快速查询已购买历史记录及日期";
+
+                // Initial search trigger
+                handleSearch();
+            }
+        }
+
+        // Modal Helpers
+        function openAddModal() {
+            const modal = document.getElementById('add-modal');
+            const card = document.getElementById('modal-card');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                card.classList.remove('translate-y-full');
+                document.getElementById('item-name-input').focus();
+            }, 10);
+        }
+
+        function closeAddModal() {
+            const modal = document.getElementById('add-modal');
+            const card = document.getElementById('modal-card');
+            modal.classList.add('opacity-0');
+            card.classList.add('translate-y-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        // Utility: Toast Notification
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.textContent = msg;
+
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2000);
+        }
+
+        // Utility: Get YYYY-MM-DD Date Format
+        function getFormattedDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Utility: XSS Protection
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/"/g, "&quot;")
+                      .replace(/'/g, "&#039;");
+        }
+
+        // Service Worker inline Registration for PWA functionality
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    const CACHE_NAME = 'wishlist-pwa-v1';
+                    self.addEventListener('install', e => {
+                        e.waitUntil(self.skipWaiting());
+                    });
+                    self.addEventListener('activate', e => {
+                        e.waitUntil(self.clients.claim());
+                    });
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(
+                            caches.match(e.request).then(response => {
+                                return response || fetch(e.request).catch(() => caches.match(e.request));
+                            })
+                        );
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                navigator.serviceWorker.register(swUrl)
+                    .then(() => console.log('Service Worker Registered Successfully'))
+                    .catch(err => console.log('Service Worker Registration Failed', err));
+            }
+        }
+    </script>
+</body>
+</html>
